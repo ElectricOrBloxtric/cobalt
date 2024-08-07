@@ -1,6 +1,6 @@
 export default async function(obj) {
     try {
-        let response = await fetch(`https://rumble.com/service.php?name=media.details&url=${obj.id}`);
+        let response = await fetch(`https://rumble.com/service.php?name=media.details&url=/${obj.id}`);
         let data = await response.json();
 
         if (data.videos && data.videos.length > 0) {
