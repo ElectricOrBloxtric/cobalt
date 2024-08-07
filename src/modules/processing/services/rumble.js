@@ -9,7 +9,7 @@ export default async function(obj) {
             let cleanTitle = title.replace(/\.html$/, '');
 
             return {
-                urls: videoUrl.replace("http://", "https://"),
+                urls: videoUrl,
                 filename: `${cleanTitle}.mp4`,
                 audioFilename: `${cleanTitle}_audio`
             };
