@@ -5,10 +5,13 @@ export default async function(obj) {
 
         if (data.videos && data.videos.length > 0) {
             let videoUrl = data.videos[0].url;
+            let title = data.title || `rumble_${obj.id}`;
+            let cleanTitle = title.replace(/\.html$/, '');
+
             return {
                 urls: videoUrl.replace("http://", "https://"),
-                filename: `rumble_${obj.id}.mp4`,
-                audioFilename: `rumble_${obj.id}_audio`
+                filename: `${cleanTitle}.mp4`,
+                audioFilename: `${cleanTitle}_audio`
             };
         } else {
             return { error: 'ErrorNoVideosFound' };
