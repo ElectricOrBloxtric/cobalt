@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 
-import { env } from '../config.js';
+import { env } from "../config.js";
 import { createResponse } from "../processing/request.js";
 import loc from "../../localization/manager.js";
 
@@ -19,6 +19,7 @@ import vimeo from "./services/vimeo.js";
 import soundcloud from "./services/soundcloud.js";
 import instagram from "./services/instagram.js";
 import vine from "./services/vine.js";
+import rumble from "./services/rumble.js";
 import pinterest from "./services/pinterest.js";
 import streamable from "./services/streamable.js";
 import twitch from "./services/twitch.js";
@@ -30,213 +31,224 @@ import facebook from "./services/facebook.js";
 
 let freebind;
 
-export default async function(host, patternMatch, lang, obj) {
-    const { url } = obj;
-    assert(url instanceof URL);
-    let dispatcher, requestIP;
+export default async function (host, patternMatch, lang, obj) {
+  const { url } = obj;
+  assert(url instanceof URL);
+  let dispatcher, requestIP;
 
-    if (env.freebindCIDR) {
-        if (!freebind) {
-            freebind = await import('freebind');
-        }
-
-        requestIP = freebind.ip.random(env.freebindCIDR);
-        dispatcher = freebind.dispatcherFromIP(requestIP, { strict: false });
+  if (env.freebindCIDR) {
+    if (!freebind) {
+      freebind = await import("freebind");
     }
 
-    try {
-        let r,
-            isAudioOnly = !!obj.isAudioOnly,
-            disableMetadata = !!obj.disableMetadata;
+    requestIP = freebind.ip.random(env.freebindCIDR);
+    dispatcher = freebind.dispatcherFromIP(requestIP, { strict: false });
+  }
 
-        if (!testers[host]) {
-            return createResponse("error", {
-                t: loc(lang, 'ErrorUnsupported')
-            });
-        }
-        if (!(testers[host](patternMatch))) {
-            return createResponse("error", {
-                t: loc(lang, 'ErrorBrokenLink', host)
-            });
-        }
+  try {
+    let r,
+      isAudioOnly = !!obj.isAudioOnly,
+      disableMetadata = !!obj.disableMetadata;
 
-        switch (host) {
-            case "twitter":
-                r = await twitter({
-                    id: patternMatch.id,
-                    index: patternMatch.index - 1,
-                    toGif: !!obj.twitterGif,
-                    dispatcher
-                });
-                break;
-            case "vk":
-                r = await vk({
-                    userId: patternMatch.userId,
-                    videoId: patternMatch.videoId,
-                    quality: obj.vQuality
-                });
-                break;
-            case "ok":
-                r = await ok({
-                    id: patternMatch.id,
-                    quality: obj.vQuality
-                });
-                break;
-            case "bilibili":
-                r = await bilibili(patternMatch);
-                break;
-            case "youtube":
-                let fetchInfo = {
-                    id: patternMatch.id.slice(0, 11),
-                    quality: obj.vQuality,
-                    format: obj.vCodec,
-                    isAudioOnly: isAudioOnly,
-                    isAudioMuted: obj.isAudioMuted,
-                    dubLang: obj.dubLang,
-                    dispatcher
-                }
+    if (!testers[host]) {
+      return createResponse("error", {
+        t: loc(lang, "ErrorUnsupported"),
+      });
+    }
+    if (!testers[host](patternMatch)) {
+      return createResponse("error", {
+        t: loc(lang, "ErrorBrokenLink", host),
+      });
+    }
 
-                if (url.hostname === 'music.youtube.com' || isAudioOnly === true) {
-                    fetchInfo.quality = "max";
-                    fetchInfo.format = "vp9";
-                    fetchInfo.isAudioOnly = true
-                }
+    switch (host) {
+      case "twitter":
+        r = await twitter({
+          id: patternMatch.id,
+          index: patternMatch.index - 1,
+          toGif: !!obj.twitterGif,
+          dispatcher,
+        });
+        break;
+      case "vk":
+        r = await vk({
+          userId: patternMatch.userId,
+          videoId: patternMatch.videoId,
+          quality: obj.vQuality,
+        });
+        break;
+      case "ok":
+        r = await ok({
+          id: patternMatch.id,
+          quality: obj.vQuality,
+        });
+        break;
+      case "bilibili":
+        r = await bilibili(patternMatch);
+        break;
+      case "youtube":
+        let fetchInfo = {
+          id: patternMatch.id.slice(0, 11),
+          quality: obj.vQuality,
+          format: obj.vCodec,
+          isAudioOnly: isAudioOnly,
+          isAudioMuted: obj.isAudioMuted,
+          dubLang: obj.dubLang,
+          dispatcher,
+        };
 
-                r = await youtube(fetchInfo);
-                break;
-            case "reddit":
-                r = await reddit({
-                    sub: patternMatch.sub,
-                    id: patternMatch.id,
-                    user: patternMatch.user
-                });
-                break;
-            case "tiktok":
-                r = await tiktok({
-                    postId: patternMatch.postId,
-                    id: patternMatch.id,
-                    fullAudio: obj.isTTFullAudio,
-                    isAudioOnly: isAudioOnly,
-                    h265: obj.tiktokH265
-                });
-                break;
-            case "tumblr":
-                r = await tumblr({
-                    id: patternMatch.id,
-                    user: patternMatch.user,
-                    url
-                });
-                break;
-            case "vimeo":
-                r = await vimeo({
-                    id: patternMatch.id.slice(0, 11),
-                    password: patternMatch.password,
-                    quality: obj.vQuality,
-                    isAudioOnly: isAudioOnly
-                });
-                break;
-            case "soundcloud":
-                isAudioOnly = true;
-                r = await soundcloud({
-                    url,
-                    author: patternMatch.author,
-                    song: patternMatch.song,
-                    format: obj.aFormat,
-                    shortLink: patternMatch.shortLink || false,
-                    accessKey: patternMatch.accessKey || false
-                });
-                break;
-            case "instagram":
-                r = await instagram({
-                    ...patternMatch,
-                    quality: obj.vQuality,
-                    dispatcher
-                })
-                break;
-            case "vine":
-                r = await vine({
-                    id: patternMatch.id
-                });
-                break;
-            case "pinterest":
-                r = await pinterest({
-                    id: patternMatch.id,
-                    shortLink: patternMatch.shortLink || false
-                });
-                break;
-            case "streamable":
-                r = await streamable({
-                    id: patternMatch.id,
-                    quality: obj.vQuality,
-                    isAudioOnly: isAudioOnly,
-                });
-                break;
-            case "twitch":
-                r = await twitch({
-                    clipId: patternMatch.clip || false,
-                    quality: obj.vQuality,
-                    isAudioOnly: obj.isAudioOnly
-                });
-                break;
-            case "rutube":
-                r = await rutube({
-                    id: patternMatch.id,
-                    yappyId: patternMatch.yappyId,
-                    key: patternMatch.key,
-                    quality: obj.vQuality,
-                    isAudioOnly: isAudioOnly
-                });
-                break;
-            case "dailymotion":
-                r = await dailymotion(patternMatch);
-                break;
-            case "snapchat":
-                r = await snapchat({
-                    hostname: url.hostname,
-                    ...patternMatch
-                });
-                break;
-            case "loom":
-                r = await loom({
-                    id: patternMatch.id
-                });
-                break;
-            case "facebook":
-                r = await facebook({
-                    ...patternMatch
-                });
-                break;
-            default:
-                return createResponse("error", {
-                    t: loc(lang, 'ErrorUnsupported')
-                });
+        if (url.hostname === "music.youtube.com" || isAudioOnly === true) {
+          fetchInfo.quality = "max";
+          fetchInfo.format = "vp9";
+          fetchInfo.isAudioOnly = true;
         }
 
-        if (r.isAudioOnly) isAudioOnly = true;
-        let isAudioMuted = isAudioOnly ? false : obj.isAudioMuted;
-
-        if (r.error && r.critical) {
-            return createResponse("critical", {
-                t: loc(lang, r.error)
-            })
-        }
-        if (r.error) {
-            return createResponse("error", {
-                t: Array.isArray(r.error)
-                    ? loc(lang, r.error[0], r.error[1])
-                    : loc(lang, r.error)
-            })
-        }
-
-        return matchActionDecider(
-            r, host, obj.aFormat, isAudioOnly,
-            lang, isAudioMuted, disableMetadata,
-            obj.filenamePattern, obj.twitterGif,
-            requestIP
-        )
-    } catch {
+        r = await youtube(fetchInfo);
+        break;
+      case "reddit":
+        r = await reddit({
+          sub: patternMatch.sub,
+          id: patternMatch.id,
+          user: patternMatch.user,
+        });
+        break;
+      case "tiktok":
+        r = await tiktok({
+          postId: patternMatch.postId,
+          id: patternMatch.id,
+          fullAudio: obj.isTTFullAudio,
+          isAudioOnly: isAudioOnly,
+          h265: obj.tiktokH265,
+        });
+        break;
+      case "tumblr":
+        r = await tumblr({
+          id: patternMatch.id,
+          user: patternMatch.user,
+          url,
+        });
+        break;
+      case "vimeo":
+        r = await vimeo({
+          id: patternMatch.id.slice(0, 11),
+          password: patternMatch.password,
+          quality: obj.vQuality,
+          isAudioOnly: isAudioOnly,
+        });
+        break;
+      case "soundcloud":
+        isAudioOnly = true;
+        r = await soundcloud({
+          url,
+          author: patternMatch.author,
+          song: patternMatch.song,
+          format: obj.aFormat,
+          shortLink: patternMatch.shortLink || false,
+          accessKey: patternMatch.accessKey || false,
+        });
+        break;
+      case "instagram":
+        r = await instagram({
+          ...patternMatch,
+          quality: obj.vQuality,
+          dispatcher,
+        });
+        break;
+      case "vine":
+        r = await vine({
+          id: patternMatch.id,
+        });
+        break;
+      case "rumble":
+        r = await rumble({
+          id: patternMatch.id,
+        });
+        break;
+      case "pinterest":
+        r = await pinterest({
+          id: patternMatch.id,
+          shortLink: patternMatch.shortLink || false,
+        });
+        break;
+      case "streamable":
+        r = await streamable({
+          id: patternMatch.id,
+          quality: obj.vQuality,
+          isAudioOnly: isAudioOnly,
+        });
+        break;
+      case "twitch":
+        r = await twitch({
+          clipId: patternMatch.clip || false,
+          quality: obj.vQuality,
+          isAudioOnly: obj.isAudioOnly,
+        });
+        break;
+      case "rutube":
+        r = await rutube({
+          id: patternMatch.id,
+          yappyId: patternMatch.yappyId,
+          key: patternMatch.key,
+          quality: obj.vQuality,
+          isAudioOnly: isAudioOnly,
+        });
+        break;
+      case "dailymotion":
+        r = await dailymotion(patternMatch);
+        break;
+      case "snapchat":
+        r = await snapchat({
+          hostname: url.hostname,
+          ...patternMatch,
+        });
+        break;
+      case "loom":
+        r = await loom({
+          id: patternMatch.id,
+        });
+        break;
+      case "facebook":
+        r = await facebook({
+          ...patternMatch,
+        });
+        break;
+      default:
         return createResponse("error", {
-            t: loc(lang, 'ErrorBadFetch', host)
-        })
+          t: loc(lang, "ErrorUnsupported"),
+        });
     }
+
+    if (r.isAudioOnly) isAudioOnly = true;
+    let isAudioMuted = isAudioOnly ? false : obj.isAudioMuted;
+
+    if (r.error && r.critical) {
+      return createResponse("critical", {
+        t: loc(lang, r.error),
+      });
+    }
+    if (r.error) {
+      return createResponse("error", {
+        t: Array.isArray(r.error)
+          ? loc(lang, r.error[0], r.error[1])
+          : loc(lang, r.error),
+      });
+    }
+
+    return matchActionDecider(
+      r,
+      host,
+      obj.aFormat,
+      isAudioOnly,
+      lang,
+      isAudioMuted,
+      disableMetadata,
+      obj.filenamePattern,
+      obj.twitterGif,
+      requestIP,
+    );
+  } catch {
+    return createResponse("error", {
+      t: loc(lang, "ErrorBadFetch", host),
+    });
+  }
 }
